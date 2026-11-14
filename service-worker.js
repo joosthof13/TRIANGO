@@ -1,6 +1,6 @@
 /* TRIANGO: offline-first app shell, no external requests. */
-const CACHE = 'triango-pwa-v1';
-const CORE = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png'];
+const CACHE = 'triango-pwa-v3';
+const CORE = ['./', './index.html', './difficulty.js', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(CORE)).then(() => self.skipWaiting()));
 });
