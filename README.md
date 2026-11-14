@@ -26,3 +26,28 @@ Open `index.html` in a browser. The game is playable immediately, but install/of
 ## Updating
 
 Replace the hosted files with the updated versions. For service-worker cache updates, change `triango-pwa-v1` in `service-worker.js` to a new version number to trigger cache refresh. Avoid clearing site data if you want to retain saved progress.
+
+## Logical difficulty calibration (v3)
+
+New puzzles are **rated by deduction difficulty**, not only clue count. TRIANGO generates a candidate, verifies that it has one solution, then solves it repeatedly using the same rule-by-rule hint deduction engine available to players.
+
+At every step, the grader chooses an available move with the shortest complete deduction proof and records the number of placements, the longest proof, and how many multi-step proofs were needed. No guessing or backtracking is permitted in the grading path.
+
+The resulting logic score determines the level:
+
+| Level | Accepted logic score |
+| --- | ---: |
+| Relaxed | 0–34 |
+| Standard | 35–49 |
+| Expert | 50–66 |
+| Master | 67+ |
+
+The generator retries with deterministic, seed-derived candidates until a puzzle fits the chosen range. Each puzzle also shows its logic score under the grid. This creates **non-overlapping measured difficulty bands**, although individual people can still experience specific puzzles differently.
+
+### Saved games and updates
+
+Saved games created with the original puzzle generator remain playable after this update: unversioned saved puzzles are reconstructed with the original generator, while new ones use v3. Once you start a new puzzle, TRIANGO automatically uses the calibrated generator. The service worker caches `difficulty.js` for offline play; if your installed Home Screen version still looks old, fully close the app and reopen it after the Pages deployment, or refresh it online.
+
+### Validation
+
+Test the generator from a local checkout using `node tests/difficulty.test.cjs`. The test checks reproducibility, uniqueness, deduction-only solvability, and whether each generated puzzle falls within the correct non-overlapping score band. No npm install is necessary.
