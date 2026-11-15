@@ -51,3 +51,14 @@ Saved games created with the original puzzle generator remain playable after thi
 ### Validation
 
 Test the generator from a local checkout using `node tests/difficulty.test.cjs`. The test checks reproducibility, uniqueness, deduction-only solvability, and whether each generated puzzle falls within the correct non-overlapping score band. No npm install is necessary.
+
+## Pause and placement sounds (v4)
+
+- Tap **Ⅱ Pause** to freeze the timer and completely cover the grid. Nothing on the board, including given shapes or relation clues, remains visible.
+- Tap **Resume game** (or the top Resume button) to reveal the existing grid again and continue from the frozen elapsed time. Keyboard shortcut: **P** to pause or resume.
+- Moves, notes, undo, hints, and checks are disabled during a pause.
+- A pause persists across Safari reloads and Home Screen app relaunches. The clock does not run while paused, including between sessions.
+- Each shape placement now plays its own lower-pitched, bassier Cream-keyboard sound. Click **♫** in the header to mute or unmute (the preference is saved). The 3 sounds are embedded in `soundbank.js`, which is precached for offline play.
+- Sounds are modified recordings from the MIT-licensed `kbsim` project by Thomas Lai; see `SOUND-LICENSE.txt`. No other third-party services or network calls are necessary to play them.
+
+After a release, if your installed iPhone version still looks older, fully close and reopen it online to allow the updated `triango-pwa-v4` service worker to install and activate. Progress is preserved.
