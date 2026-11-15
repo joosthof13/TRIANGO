@@ -61,6 +61,17 @@ h1 { font-size:clamp(30px,4.1vw,44px); font-weight:730; letter-spacing:-.055em; 
 .progress { height:3px; background:var(--given); margin-bottom:19px; overflow:hidden; }
 .progress>div { height:100%; background:var(--ink); width:0; transition:width .2s; }
 .board-wrap { width:min(100%,535px); margin:auto; }
+.board-stage { position:relative; width:100%; aspect-ratio:1; }
+.board-stage .board { width:100%; height:100%; }
+.board-stage.is-paused .board { visibility:hidden; pointer-events:none; }
+.pause-cover { position:absolute; inset:0; border:2px solid var(--heavy); background:var(--paper); display:flex; flex-direction:column; justify-content:center; align-items:center; gap:13px; text-align:center; padding:18px; z-index:7; }
+.pause-cover[hidden] { display:none; }
+.pause-cover .pause-symbol { font-size:32px; font-weight:400; line-height:1; color:var(--ink); }
+.pause-cover h3 { font-size:22px; letter-spacing:-.035em; margin:0; }
+.pause-cover p { font-size:12px; color:var(--muted); margin:0; }
+.pause-cover button { border:1px solid var(--ink); color:var(--paper); background:var(--ink); border-radius:8px; padding:12px 23px; min-height:43px; font-weight:650; }
+.game-panel.is-paused .tap-guide, .game-panel.is-paused .toolrow, .game-panel.is-paused .feedback, .game-panel.is-paused .hint-panel { visibility:hidden; }
+.game-panel.is-paused .progress > div { transition:none; }
 .board { display:grid; grid-template-columns:repeat(var(--n),minmax(0,1fr)); border:2px solid var(--heavy); border-radius:2px; background:var(--heavy); aspect-ratio:1; isolation:isolate; user-select:none; touch-action:manipulation; }
 .cell { position:relative; display:flex; align-items:center; justify-content:center; min-width:0; min-height:0; padding:0; background:var(--paper); border:0; border-right:1px solid var(--grid); border-bottom:1px solid var(--grid); color:var(--ink); overflow:visible; }
 .cell.group-right { border-right:2px solid var(--heavy); }
@@ -154,6 +165,7 @@ body.night .feedback.success, body.night .feedback.success .light { color:#a7dab
 @media(max-width:490px) { .brand { font-size:16px; } .brandmark { width:48px; } .brandmark svg { width:48px; } .intro h1 { font-size:34px; } .game-panel { padding:12px 10px 15px; } .sidebar { display:flex; } .board-footer { font-size:10px; } .difficulties button { font-size:11px; } .stat strong { font-size:14px; } .top-row { gap:5px; } .toolrow { gap:5px; } .tool { gap:4px; font-size:11px; } .edge { border-radius:3px; } }
 @media(prefers-reduced-motion:reduce) { *, *::before, *::after { animation:none!important; transition:none!important; } }
 </style>
+<script src="./soundbank.js"></script>
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
@@ -167,16 +179,16 @@ body.night .feedback.success, body.night .feedback.success .light { color:#a7dab
 <main>
   <header class="site-header">
     <div class="brand"><span class="brandmark" aria-hidden="true"><svg viewBox="0 0 66 22" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="9" cy="11" r="7.4"/><rect x="25" y="3.6" width="14.8" height="14.8"/><path d="M57 3.5 65 18.2H49z"/></svg></span>TRIANGO</div>
-    <div class="header-actions"><button class="link-btn" id="rulesButton">How to play</button><button class="theme-button" id="themeButton" title="Toggle dark mode" aria-label="Toggle dark mode">◐</button></div>
+    <div class="header-actions"><button class="link-btn" id="rulesButton">How to play</button><button class="theme-button" id="soundButton" aria-pressed="true" title="Mute placement sounds" aria-label="Mute placement sounds">♫</button><button class="theme-button" id="themeButton" title="Toggle dark mode" aria-label="Toggle dark mode">◐</button></div>
   </header>
   <div class="intro"><p class="eyebrow">A PURE LOGIC PUZZLE</p><h1>Think in shapes.</h1><p>Three shapes. One solution. No guessing.</p></div>
   <div class="game-layout">
-    <section class="game-panel" aria-label="Puzzle game">
-      <div class="top-row"><div><div class="overline" id="puzzleNumber">Puzzle · #000000</div><h2 class="panel-title" id="puzzleName">A fresh challenge</h2></div><button class="new-btn" id="newButton">↻ &nbsp; New puzzle</button></div>
+    <section class="game-panel" id="gamePanel" aria-label="Puzzle game">
+      <div class="top-row"><div><div class="overline" id="puzzleNumber">Puzzle · #000000</div><h2 class="panel-title" id="puzzleName">A fresh challenge</h2></div><div style="display:flex;gap:7px;align-items:center"><button class="new-btn" id="pauseButton" aria-pressed="false">Ⅱ &nbsp; Pause</button><button class="new-btn" id="newButton">↻ &nbsp; New puzzle</button></div></div>
       <nav class="difficulties" aria-label="Difficulty"><button data-level="relaxed">Relaxed</button><button data-level="standard" class="active">Standard</button><button data-level="expert">Expert</button><button data-level="master">Master</button></nav>
       <div class="stats"><div class="stat"><span class="label">Time</span><strong id="timer">00:00</strong></div><div class="stat"><span class="label">Completed</span><strong id="completed">0%</strong></div><div class="stat"><span class="label">Hints used</span><strong id="hintsCount">0</strong></div></div>
       <div class="progress"><div id="progressBar"></div></div>
-      <div class="board-wrap"><div class="board" id="board" role="grid" aria-label="Triango game grid"></div><div class="board-footer"><span id="boardDescription">9 × 9 · 3 of each per row</span><span id="diagonalIndicator"></span></div></div>
+      <div class="board-wrap"><div class="board-stage" id="boardStage"><div class="board" id="board" role="grid" aria-label="Triango game grid"></div><div class="pause-cover" id="pauseCover" hidden role="status"><span class="pause-symbol" aria-hidden="true">Ⅱ</span><h3>Paused</h3><p>The board is hidden and the clock is stopped.</p><button type="button" id="resumeButton">Resume game</button></div></div><div class="board-footer"><span id="boardDescription">9 × 9 · 3 of each per row</span><span id="diagonalIndicator"></span></div></div>
       <p class="tap-guide"><strong>Tap a cell to cycle</strong> &nbsp; <span class="cycle-mark">○ → □ → △ → ⊘</span></p>
       <div class="toolrow"><button class="tool" id="undoButton">↶ <span>Undo</span></button><button class="tool" id="eraserButton">⌫ <span>Erase</span></button><button class="tool" id="checkButton">✓ <span>Check</span></button><button class="tool primary" id="hintButton">✧ <span>Hint</span></button></div>
       <div class="feedback" id="feedback" aria-live="polite"><span class="light">○</span><span>Tap an empty cell to place a circle. Tap again for a square, then a triangle.</span></div>
@@ -203,7 +215,7 @@ body.night .feedback.success, body.night .feedback.success .light { color:#a7dab
   </div>
 </main>
 <div class="footer">TRIANGO &nbsp;·&nbsp; Unique, logic-solvable puzzles &nbsp;·&nbsp; Progress saved on this device</div>
-<div class="modal-back" id="rulesModal" hidden><div class="modal" role="dialog" aria-modal="true" aria-labelledby="rulesTitle"><div class="ornament">○ &nbsp; □ &nbsp; △</div><h2 id="rulesTitle">How to play</h2><p>Fill the entire board using three shapes.</p><ol class="how-list"><li>Every row, column and bold-bordered region must have <strong>equal counts</strong> of circles, squares and triangles.</li><li>Never put <strong>three identical shapes together</strong> horizontally or vertically.</li><li>Between cells, <strong>=</strong> means equal, <strong>×</strong> means different, and arrows follow the cycle <strong>circle → square → triangle → circle</strong>.</li><li>In <strong>Master</strong>, both long diagonals also need equal numbers of each shape.</li><li><strong>Click an editable cell</strong> once for a circle, twice for a square, three times for a triangle, and a fourth time to clear it. Given shapes are fixed.</li><li>Tap <strong>Hint</strong> to see a logically forced move and a step-by-step explanation. You can place it yourself or use <strong>Place this shape</strong>.</li></ol><p>Difficulty levels are calibrated from complete, proven deduction paths. Their logic-score bands do not overlap; individual solving time may still vary.</p><p>Keyboard: <kbd>1</kbd> circle, <kbd>2</kbd> square, <kbd>3</kbd> triangle, <kbd>⌫</kbd> erase, arrow keys to move, <kbd>Ctrl+Z</kbd> undo.</p><div class="modal-actions"><button class="action primary" data-dismiss>Start solving</button></div></div></div>
+<div class="modal-back" id="rulesModal" hidden><div class="modal" role="dialog" aria-modal="true" aria-labelledby="rulesTitle"><div class="ornament">○ &nbsp; □ &nbsp; △</div><h2 id="rulesTitle">How to play</h2><p>Fill the entire board using three shapes.</p><ol class="how-list"><li>Every row, column and bold-bordered region must have <strong>equal counts</strong> of circles, squares and triangles.</li><li>Never put <strong>three identical shapes together</strong> horizontally or vertically.</li><li>Between cells, <strong>=</strong> means equal, <strong>×</strong> means different, and arrows follow the cycle <strong>circle → square → triangle → circle</strong>.</li><li>In <strong>Master</strong>, both long diagonals also need equal numbers of each shape.</li><li>Tap <strong>Pause</strong> to hide the entire board and freeze the timer until you resume. Paused games stay paused after reopening the app.</li><li><strong>Click an editable cell</strong> once for a circle, twice for a square, three times for a triangle, and a fourth time to clear it. Given shapes are fixed.</li><li>Tap <strong>Hint</strong> to see a logically forced move and a step-by-step explanation. You can place it yourself or use <strong>Place this shape</strong>.</li></ol><p>Difficulty levels are calibrated from complete, proven deduction paths. Their logic-score bands do not overlap; individual solving time may still vary.</p><p>Keyboard: <kbd>1</kbd> circle, <kbd>2</kbd> square, <kbd>3</kbd> triangle, <kbd>⌫</kbd> erase, arrow keys to move, <kbd>Ctrl+Z</kbd> undo.</p><div class="modal-actions"><button class="action primary" data-dismiss>Start solving</button></div></div></div>
 <div class="modal-back" id="winModal" hidden><div class="modal" role="dialog" aria-modal="true" aria-labelledby="winTitle"><div class="ornament">○ &nbsp; □ &nbsp; △</div><h2 id="winTitle">Puzzle solved.</h2><p id="winDetails">Every clue follows. Nice work.</p><div class="modal-actions"><button class="action" data-dismiss>View my board</button><button class="action primary" id="nextPuzzle">Next puzzle</button></div></div></div>
 <script>
 /* Pure puzzle engine: exact-count CSP, no-three rule, relation constraints, and uniqueness checks. */
@@ -418,24 +430,24 @@ if(typeof module!=='undefined')module.exports=Engine;
   'use strict';
   const WORDS=['Circle','Square','Triangle'];
   const $=id=>document.getElementById(id), storageKey='triango-v2-progress',themeKey='triango-v2-theme';
-  let puzzle=null, board=[],notes=[],selected=0,notesMode=false,hints=0,elapsed=0,secondsAnchor=Date.now(),history=[],won=false,checkErrors=new Set(),feedbackType='normal',seedSequence=0;
+  let puzzle=null, board=[],notes=[],selected=0,notesMode=false,hints=0,elapsed=0,secondsAnchor=Date.now(),history=[],won=false,paused=false,checkErrors=new Set(),feedbackType='normal',seedSequence=0;
   let hintShown=null;
   const levels={relaxed:['The warm-up','6 × 6'],standard:['Think in threes','9 × 9'],expert:['Beyond the obvious','9 × 9'],master:['The diagonal challenge','9 × 9']};
   function formatTime(s){return `${String(Math.floor(s/3600)).padStart(2,'0')}:${String(Math.floor(s%3600/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`.replace(/^00:/,'');}
-  function syncClock(){if(!won){const s=elapsed+Math.floor((Date.now()-secondsAnchor)/1000);$('timer').textContent=formatTime(s);}}
-  function getSeconds(){return elapsed+(won?0:Math.floor((Date.now()-secondsAnchor)/1000));}
+  function syncClock(){if(puzzle)$('timer').textContent=formatTime(getSeconds());}
+  function getSeconds(){return elapsed+((won||paused)?0:Math.floor((Date.now()-secondsAnchor)/1000));}
   function setFeedback(str,type='normal'){feedbackType=type;const f=$('feedback');f.className='feedback'+(type==='normal'?'':' '+type);f.innerHTML='';const em=document.createElement('span');em.className='light';em.textContent=type==='success'?'✓':type==='warning'?'!':'✦';const txt=document.createElement('span');txt.textContent=str;f.append(em,txt);}
-  function serialize(){if(!puzzle)return;try{localStorage.setItem(storageKey,JSON.stringify({level:puzzle.level,seed:puzzle.seed,board,notes,selected,notesMode,hints,elapsed:getSeconds(),won,engineVersion:puzzle.engineVersion||2}));}catch(e){}}
+  function serialize(){if(!puzzle)return;try{localStorage.setItem(storageKey,JSON.stringify({level:puzzle.level,seed:puzzle.seed,board,notes,selected,notesMode,hints,elapsed:getSeconds(),won,paused,engineVersion:puzzle.engineVersion||2}));}catch(e){}}
   function cleanNotes(){for(let i=0;i<board.length;i++)if(board[i]!==null)notes[i]=0;}
   function initPuzzle(level='standard',seed){
-    try{const p=Engine.create(level,seed===undefined?(Math.random()*0xffffffff)>>>0:seed>>>0);puzzle=p;board=p.givens.slice();notes=Array(p.cfg.n*p.cfg.n).fill(0);selected=board.findIndex(x=>x===null);if(selected<0)selected=0;notesMode=false;hints=0;elapsed=0;secondsAnchor=Date.now();history=[];won=false;hintShown=null;$('hintPanel').hidden=true;checkErrors.clear();$('winModal').hidden=true;setFeedback('Tap an empty cell to place a circle. Tap again for square, triangle, then empty.');render();serialize();
+    try{const p=Engine.create(level,seed===undefined?(Math.random()*0xffffffff)>>>0:seed>>>0);puzzle=p;board=p.givens.slice();notes=Array(p.cfg.n*p.cfg.n).fill(0);selected=board.findIndex(x=>x===null);if(selected<0)selected=0;notesMode=false;hints=0;elapsed=0;secondsAnchor=Date.now();history=[];won=false;paused=false;hintShown=null;$('hintPanel').hidden=true;checkErrors.clear();$('winModal').hidden=true;setFeedback('Tap an empty cell to place a circle. Tap again for square, triangle, then empty.');render();serialize();
     }catch(error){console.error(error);setFeedback('Could not generate this puzzle. Please choose New puzzle to retry.','warning');}
   }
   function load(){
     let data;try{data=JSON.parse(localStorage.getItem(storageKey));}catch(e){}
     if(data && levels[data.level] && Number.isInteger(data.seed)){
       try{const p=(data.engineVersion===3?Engine.create:Engine.createLegacy)(data.level,data.seed);if(Array.isArray(data.board)&&data.board.length===p.givens.length&&data.board.every((v,i)=>p.givens[i]===null?(v===null || Number.isInteger(v)&&v>=0&&v<=2):v===p.givens[i])){
-        puzzle=p;board=data.board;notes=Array.isArray(data.notes)&&data.notes.length===board.length?data.notes.map(v=>Number.isInteger(v)?v&7:0):Array(board.length).fill(0);cleanNotes();selected=Number.isInteger(data.selected)?Math.max(0,Math.min(board.length-1,data.selected)):0;notesMode=false;hints=Math.max(0,Number(data.hints)||0);elapsed=Math.max(0,Math.floor(Number(data.elapsed)||0));secondsAnchor=Date.now();won=!!data.won;history=[];hintShown=null;$('hintPanel').hidden=true;checkErrors.clear();render();if(won)$('timer').textContent=formatTime(elapsed);setFeedback(won?'Puzzle completed — well played!':'Your puzzle has been restored. Click a cell to cycle through the shapes.',won?'success':'normal');return;
+        puzzle=p;board=data.board;notes=Array.isArray(data.notes)&&data.notes.length===board.length?data.notes.map(v=>Number.isInteger(v)?v&7:0):Array(board.length).fill(0);cleanNotes();selected=Number.isInteger(data.selected)?Math.max(0,Math.min(board.length-1,data.selected)):0;notesMode=false;hints=Math.max(0,Number(data.hints)||0);elapsed=Math.max(0,Math.floor(Number(data.elapsed)||0));secondsAnchor=Date.now();won=!!data.won;paused=!won&&!!data.paused;history=[];hintShown=null;$('hintPanel').hidden=true;checkErrors.clear();render();if(won||paused)$('timer').textContent=formatTime(elapsed);setFeedback(won?'Puzzle completed — well played!':'Your puzzle has been restored. Click a cell to cycle through the shapes.',won?'success':'normal');return;
       }}catch(e){console.warn('Could not restore puzzle',e);}
     }
     initPuzzle();
@@ -454,7 +466,7 @@ if(typeof module!=='undefined')module.exports=Engine;
     else { shape=document.createElementNS(ns,'polygon');shape.setAttribute('points','22,7.5 36,35 8,35'); }
     svg.append(shape);return svg;
   }
-  function renderBoard(){
+  function renderBoard(){if(paused){$('board').replaceChildren();return;}
     const n=puzzle.cfg.n,el=$('board'),cfg=puzzle.cfg,edges=edgesAroundCell(),frag=document.createDocumentFragment(),conflictSet=getConflicts();
     el.style.setProperty('--n',n);el.setAttribute('aria-rowcount',n);el.setAttribute('aria-colcount',n);
     for(let i=0;i<board.length;i++){
@@ -478,12 +490,15 @@ if(typeof module!=='undefined')module.exports=Engine;
   function render(){if(!puzzle)return;
     const level=puzzle.level,n=puzzle.cfg.n,empty=puzzle.givens.filter(v=>v===null).length,filled=board.reduce((a,v,i)=>a+(v!==null&&puzzle.givens[i]===null?1:0),0),pct=Math.round(filled/empty*100);
     $('puzzleNumber').textContent='PUZZLE · #'+String(puzzle.seed%1000000).padStart(6,'0');$('puzzleName').textContent=levels[level][0];$('completed').textContent=pct+'%';$('progressBar').style.width=pct+'%';$('hintsCount').textContent=hints;$('boardDescription').textContent=`${n} × ${n} · ${puzzle.cfg.target} of each per row, column & region${puzzle.rating?' · Logic score '+puzzle.rating.score:''}`;$('diagonalIndicator').textContent=level==='master'?'✦ Diagonals active':'';
-    document.querySelectorAll('[data-level]').forEach(b=>{b.classList.toggle('active',b.dataset.level===level);b.setAttribute('aria-pressed',b.dataset.level===level?'true':'false');});$('undoButton').disabled=history.length===0;$('eraserButton').disabled=puzzle.givens[selected]!==null;
+    document.querySelectorAll('[data-level]').forEach(b=>{b.classList.toggle('active',b.dataset.level===level);b.setAttribute('aria-pressed',b.dataset.level===level?'true':'false');});$('undoButton').disabled=paused||history.length===0;$('eraserButton').disabled=paused||puzzle.givens[selected]!==null;
+    $('newButton').disabled=paused; document.querySelectorAll('[data-level]').forEach(b=>b.disabled=paused);
+    $('pauseButton').disabled=won; $('pauseButton').textContent=paused?'▶  Resume':'Ⅱ  Pause';$('pauseButton').setAttribute('aria-pressed',paused?'true':'false');
+    $('boardStage').classList.toggle('is-paused',paused);$('gamePanel').classList.toggle('is-paused',paused);$('pauseCover').hidden=!paused;$('board').setAttribute('aria-hidden',paused?'true':'false');
     syncClock();renderBoard();
   }
   function saveUndo(){history.push({board:board.slice(),notes:notes.slice(),hints,won});if(history.length>100)history.shift();}
-  function applyValue(v){if(!puzzle||won)return;let i=selected;if(puzzle.givens[i]!==null){setFeedback('Grey cells are fixed clues. Select an empty cell instead.','warning');return;}
-    if(board[i]===v)return;saveUndo();board[i]=v;notes[i]=0;hintShown=null;$('hintPanel').hidden=true;notes[i]=0;checkErrors.clear();
+  function applyValue(v){if(!puzzle||won||paused)return;let i=selected;if(puzzle.givens[i]!==null){setFeedback('Grey cells are fixed clues. Select an empty cell instead.','warning');return;}
+    if(board[i]===v)return;saveUndo();board[i]=v;if(v!==null)playPlacementSound(v);notes[i]=0;hintShown=null;$('hintPanel').hidden=true;notes[i]=0;checkErrors.clear();
     const bad=getConflicts();if(bad.has(i))setFeedback('That placement breaks one of the rules. Look at the highlighted cells.','warning');else setFeedback(v===null?'Cell cleared. Another tap starts with a circle.':'Tap again for the next shape, or move to another cell.');
     render();serialize();checkWin();
   }
@@ -497,11 +512,11 @@ if(typeof module!=='undefined')module.exports=Engine;
     }
     return bad;
   }
-  function chooseCell(i,focus=false){if(i<0||i>=board.length)return;selected=i;renderBoard();$('eraserButton').disabled=puzzle.givens[i]!==null;if(focus){let b=$('board').querySelector(`[data-i="${i}"]`);if(b)b.focus({preventScroll:true});}serialize();}
-  function undo(){if(!puzzle||!history.length)return;const s=history.pop();board=s.board;notes=s.notes;hints=s.hints;won=s.won;hintShown=null;$('hintPanel').hidden=true;checkErrors.clear();secondsAnchor=Date.now();render();serialize();setFeedback('Undone.');}
+  function chooseCell(i,focus=false){if(paused||i<0||i>=board.length)return;selected=i;renderBoard();$('eraserButton').disabled=puzzle.givens[i]!==null;if(focus){let b=$('board').querySelector(`[data-i="${i}"]`);if(b)b.focus({preventScroll:true});}serialize();}
+  function undo(){if(!puzzle||paused||!history.length)return;const s=history.pop();board=s.board;notes=s.notes;hints=s.hints;won=s.won;hintShown=null;$('hintPanel').hidden=true;checkErrors.clear();render();serialize();setFeedback('Undone.');}
   function dismissHint(){hintShown=null;$('hintPanel').hidden=true;renderBoard();}
   function doHint(){
-    if(!puzzle||won)return;
+    if(!puzzle||won||paused)return;
     const bad=getConflicts();
     if(bad.size){setFeedback('Some cells break the rules. Correct the highlighted cells first.','warning');return;}
     const wrong=board.findIndex((v,i)=>v!==null&&v!==puzzle.solution[i]);
@@ -537,15 +552,15 @@ if(typeof module!=='undefined')module.exports=Engine;
     setFeedback(`A forced move is highlighted at ${coord(move.i)}. Read the rule-by-rule proof below, or place the shape yourself.`,'success');
   }
   function coord(i){return `R${Math.floor(i/puzzle.cfg.n)+1}C${i%puzzle.cfg.n+1}`;}
-  function applyHint(){if(!hintShown||!puzzle||won)return;selected=hintShown.move.i;applyValue(hintShown.move.value);}
+  function applyHint(){if(!hintShown||!puzzle||won||paused)return;selected=hintShown.move.i;applyValue(hintShown.move.value);}
   function checkWin(){if(board.some(x=>x===null))return;
     if(board.every((v,i)=>v===puzzle.solution[i])){
       elapsed=getSeconds();won=true;render();$('winDetails').textContent=`You solved ${levels[puzzle.level][1]} ${puzzle.level} in ${formatTime(elapsed)} with ${hints} hint${hints===1?'':'s'}. Every row, region and relationship checks out.`;$('winModal').hidden=false;setFeedback('Puzzle complete! Every rule is satisfied.','success');serialize();
     }else{setFeedback('All cells are filled, but at least one is incorrect. Try the Check function (or request a hint).','warning');}
   }
-  function checkBoard(){if(!puzzle||won)return;checkErrors=new Set(board.map((v,i)=>v!==null&&v!==puzzle.solution[i]?i:-1).filter(i=>i>=0));render();setFeedback(checkErrors.size?`${checkErrors.size} incorrect placement${checkErrors.size===1?'':'s'} highlighted. Try another symbol.`:'All placed symbols are correct so far. Keep going!',checkErrors.size?'warning':'success');}
+  function checkBoard(){if(!puzzle||won||paused)return;checkErrors=new Set(board.map((v,i)=>v!==null&&v!==puzzle.solution[i]?i:-1).filter(i=>i>=0));render();setFeedback(checkErrors.size?`${checkErrors.size} incorrect placement${checkErrors.size===1?'':'s'} highlighted. Try another symbol.`:'All placed symbols are correct so far. Keep going!',checkErrors.size?'warning':'success');}
   $('board').addEventListener('click',e=>{
-    const cell=e.target.closest('.cell');if(!cell||!puzzle||won)return;
+    const cell=e.target.closest('.cell');if(!cell||!puzzle||won||paused)return;
     const i=Number(cell.dataset.i);
     selected=i;
     if(puzzle.givens[i]===null){
@@ -559,16 +574,46 @@ if(typeof module!=='undefined')module.exports=Engine;
     const updated=$('board').querySelector(`[data-i="${i}"]`);
     if(updated)updated.focus({preventScroll:true});
   });
-  document.querySelectorAll('[data-level]').forEach(button=>button.addEventListener('click',()=>{if(puzzle.level!==button.dataset.level)initPuzzle(button.dataset.level);}));
-  $('newButton').addEventListener('click',()=>initPuzzle(puzzle.level));$('nextPuzzle').addEventListener('click',()=>initPuzzle(puzzle.level));
+  document.querySelectorAll('[data-level]').forEach(button=>button.addEventListener('click',()=>{if(!paused&&puzzle.level!==button.dataset.level)initPuzzle(button.dataset.level);}));
+  $('newButton').addEventListener('click',()=>{if(!paused)initPuzzle(puzzle.level);});$('nextPuzzle').addEventListener('click',()=>initPuzzle(puzzle.level));
   $('undoButton').addEventListener('click',undo);$('eraserButton').addEventListener('click',()=>applyValue(null));$('checkButton').addEventListener('click',checkBoard);$('hintButton').addEventListener('click',doHint);
   $('applyHint').addEventListener('click',applyHint);$('anotherHint').addEventListener('click',doHint);$('dismissHint').addEventListener('click',dismissHint);
+  function togglePause(){
+    if(!puzzle||won)return;
+    if(paused){paused=false;secondsAnchor=Date.now();setFeedback('Welcome back. Your timer has resumed.');}
+    else{elapsed=getSeconds();paused=true;hintShown=null;$('hintPanel').hidden=true;setFeedback('Game paused. Your board is hidden and your timer is stopped.');}
+    render();serialize();
+  }
+  $('pauseButton').addEventListener('click',togglePause);
+  $('resumeButton').addEventListener('click',togglePause);
   $('rulesButton').addEventListener('click',()=>$('rulesModal').hidden=false);
   document.querySelectorAll('[data-dismiss]').forEach(b=>b.addEventListener('click',()=>b.closest('.modal-back').hidden=true));
   document.querySelectorAll('.modal-back').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.hidden=true;}));
+  const soundKey='triango-sound-enabled';
+  let soundEnabled=true;
+  try{soundEnabled=localStorage.getItem(soundKey)!=='false';}catch(e){}
+  const soundPools=Array.from({length:3},(_,i)=>Array.from({length:4},()=>{
+    const a=new Audio(window.TRIANGO_SOUNDBANK?.[i] || '');
+    a.preload='auto';a.volume=0.76;return a;
+  }));
+  const soundIndexes=[0,0,0];
+  function playPlacementSound(v){
+    if(!soundEnabled||v===null||!window.TRIANGO_SOUNDBANK?.[v])return;
+    const pool=soundPools[v],a=pool[soundIndexes[v]++%pool.length];
+    try{a.pause();a.currentTime=0;const p=a.play();if(p&&p.catch)p.catch(()=>{});}catch(e){}
+  }
+  function updateSoundButton(){
+    const b=$('soundButton');b.textContent=soundEnabled?'♫':'♪̸';b.title=soundEnabled?'Mute placement sounds':'Enable placement sounds';
+    b.setAttribute('aria-label',b.title);b.setAttribute('aria-pressed',soundEnabled?'true':'false');
+    try{localStorage.setItem(soundKey,String(soundEnabled));}catch(e){}
+  }
+  $('soundButton').addEventListener('click',()=>{soundEnabled=!soundEnabled;updateSoundButton();});
+  updateSoundButton();
   function setTheme(on){document.body.classList.toggle('night',on);$('themeButton').textContent=on?'☼':'◐';try{localStorage.setItem(themeKey,on?'night':'light');}catch(e){}}
   $('themeButton').addEventListener('click',()=>setTheme(!document.body.classList.contains('night')));
   document.addEventListener('keydown',e=>{
+    if(paused){if(e.key==='Escape'||e.key.toLowerCase()==='p'){e.preventDefault();togglePause();}return;}
+    if(e.key.toLowerCase()==='p'&&![...document.querySelectorAll('.modal-back')].some(m=>!m.hidden)){e.preventDefault();togglePause();return;}
     if(e.key==='Escape'){document.querySelectorAll('.modal-back').forEach(m=>m.hidden=true);return;}
     if([...document.querySelectorAll('.modal-back')].some(m=>!m.hidden))return;
     if(e.ctrlKey||e.metaKey){if(e.key.toLowerCase()==='z'){e.preventDefault();undo();}return;}
@@ -582,7 +627,7 @@ if(typeof module!=='undefined')module.exports=Engine;
   try{setTheme(localStorage.getItem(themeKey)==='night');}catch(e){}
   load();setInterval(syncClock,1000);setInterval(serialize,12000);window.addEventListener('pagehide',serialize);
   // Check board through keyboard Enter; also from an optional browser console command for advanced players.
-  window.triango={check:checkBoard,newPuzzle:()=>initPuzzle(puzzle.level),difficulty:level=>{if(levels[level])initPuzzle(level);}};
+  window.triango={check:checkBoard,newPuzzle:()=>{if(!paused)initPuzzle(puzzle.level);},difficulty:level=>{if(!paused&&levels[level])initPuzzle(level);},pause:()=>{if(!paused)togglePause();},resume:()=>{if(paused)togglePause();}};
 })();
 </script>
 <script>
