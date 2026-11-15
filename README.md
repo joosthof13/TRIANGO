@@ -61,4 +61,4 @@ Test the generator from a local checkout using `node tests/difficulty.test.cjs`.
 - Each shape placement now plays its own lower-pitched, bassier Cream-keyboard sound. Click **♫** in the header to mute or unmute (the preference is saved). The 3 sounds are embedded in `soundbank.js`, which is precached for offline play.
 - Sounds are modified recordings from the MIT-licensed `kbsim` project by Thomas Lai; see `SOUND-LICENSE.txt`. No other third-party services or network calls are necessary to play them.
 
-After a release, if your installed iPhone version still looks older, fully close and reopen it online to allow the updated `triango-pwa-v4` service worker to install and activate. Progress is preserved.
+After a release, if your installed iPhone version still looks older, fully close and reopen it online to allow the updated `triango-pwa-v5` service worker to install and activate. Progress is preserved.
